@@ -116,7 +116,7 @@ pty = [
 windows = [
   "cronus-agent[pty]",
   "psutil==7.2.2; sys_platform == 'win32'",
-  "pywin32==308; sys_platform == 'win32'",
+  "pywin32>=310; sys_platform == 'win32'",
 ]
 honcho = ["honcho-ai==2.0.1"]
 mcp = ["mcp==1.26.0"]
