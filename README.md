@@ -52,7 +52,7 @@ If you already have Git installed, the installer detects it and uses that instea
 
 > **Android / Termux:** The tested manual path is documented in the [Termux guide](https://cronus-agent.nousresearch.com/docs/getting-started/termux). On Termux, Cronus installs a curated `.[termux]` extra because the full `.[all]` extra currently pulls Android-incompatible voice dependencies.
 >
-> **Windows:** Native Windows is supported as an **early beta** — the PowerShell one-liner above installs everything, but expect rough edges and please file issues when you hit them. If you'd rather use WSL2 (our most battle-tested Windows path), the Linux command works there too. Native Windows install lives under `%LOCALAPPDATA%\cronus`; WSL2 installs under `~/.cronus` as on Linux.  The only Cronus feature that currently needs WSL2 specifically is the browser-based dashboard chat pane (it uses a POSIX PTY — classic CLI and gateway both run natively).
+> **Windows:** Native Windows is supported as an **early beta** — the PowerShell one-liner above installs everything, but expect rough edges and please file issues when you hit them. If you'd rather use WSL2 (our most battle-tested Windows path), the Linux command works there too. Native Windows install lives under `%LOCALAPPDATA%\cronus`; WSL2 installs under `~/.cronus` as on Linux. All features — including the dashboard's embedded `/chat` terminal pane — work natively on Windows via the Windows ConPTY API (`pywinpty`). No WSL required.
 
 After installation:
 

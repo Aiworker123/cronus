@@ -88,7 +88,7 @@ Native Windows is still early beta, and per-tool API key setup (Firecrawl, FAL, 
 
 ## Feature matrix
 
-Everything except the dashboard's embedded terminal pane runs natively on Windows.
+All features run natively on Windows, including the dashboard's embedded terminal pane (via Windows ConPTY).
 
 | Feature | Native Windows | WSL2 |
 |---|---|---|
@@ -100,10 +100,10 @@ Everything except the dashboard's embedded terminal pane runs natively on Window
 | MCP servers (stdio and HTTP) | ✓ | ✓ |
 | Local Ollama / LM Studio / llama-server | ✓ | ✓ (via WSL networking) |
 | Web dashboard (sessions, jobs, metrics, config) | ✓ | ✓ |
-| Dashboard `/chat` embedded terminal pane | ✗ (needs POSIX PTY) | ✓ |
+| Dashboard `/chat` embedded terminal pane | ✓ (Windows ConPTY via pywinpty) | ✓ |
 | Auto-start at login | ✓ (schtasks) | ✓ (systemd) |
 
-The dashboard's `/chat` tab embeds a real terminal via a POSIX PTY (`ptyprocess`). Native Windows has no equivalent primitive; Python's `pywinpty` / Windows ConPTY would work but is a separate implementation — treat as future work. **The rest of the dashboard works natively** — only that one tab shows a "use WSL2 for this" banner.
+The dashboard's `/chat` tab embeds a real terminal using a pseudo-terminal. On POSIX this is `ptyprocess`; on Windows it uses `pywinpty`, which drives the Windows **ConPTY** API (available on Windows 10 build 17763 and later). Both backends are included in the `[pty]` install extra and are provisioned automatically by the installer. **The full dashboard — including the `/chat` embedded terminal — works natively on Windows with no WSL required.**
 
 ## How Cronus runs shell commands on Windows
 

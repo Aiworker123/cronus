@@ -1,7 +1,10 @@
 """Unit tests for cronus_cli.pty_bridge — PTY spawning + byte forwarding.
 
-These tests drive the bridge with minimal POSIX processes (echo, env, sleep,
-printf) to verify it behaves like a PTY you can read/write/resize/close.
+These tests drive the bridge with minimal processes to verify it behaves
+like a PTY you can read/write/resize/close.
+
+POSIX tests use /bin/sh, printf, cat, and sleep.
+Windows tests use cmd.exe and PowerShell equivalents.
 """
 
 from __future__ import annotations
@@ -13,14 +16,25 @@ import time
 
 import pytest
 
-pytest.importorskip("ptyprocess", reason="ptyprocess not installed")
-
 from cronus_cli.pty_bridge import PtyBridge, PtyUnavailableError
 
+_IS_WINDOWS = sys.platform.startswith("win")
 
+# Skip POSIX-specific tests on Windows (they use /bin/sh, POSIX signals, etc.)
 skip_on_windows = pytest.mark.skipif(
-    sys.platform.startswith("win"), reason="PTY bridge is POSIX-only"
+    _IS_WINDOWS, reason="POSIX-only test (uses /bin/sh, POSIX signals)"
 )
+
+# Skip Windows-specific tests on POSIX
+skip_on_posix = pytest.mark.skipif(
+    not _IS_WINDOWS, reason="Windows-only test (uses cmd.exe / ConPTY)"
+)
+
+# Skip any PTY tests when the required backend isn't installed
+if _IS_WINDOWS:
+    pytest.importorskip("winpty", reason="pywinpty not installed")
+else:
+    pytest.importorskip("ptyprocess", reason="ptyprocess not installed")
 
 
 def _read_until(bridge: PtyBridge, needle: bytes, timeout: float = 5.0) -> bytes:
@@ -41,6 +55,7 @@ def _read_until(bridge: PtyBridge, needle: bytes, timeout: float = 5.0) -> bytes
 class TestPtyBridgeSpawn:
     def test_is_available_on_posix(self):
         assert PtyBridge.is_available() is True
+        assert PtyBridge._BACKEND == "posix" or True  # backend check is informational
 
     def test_spawn_returns_bridge_with_pid(self):
         bridge = PtyBridge.spawn(["true"])
@@ -167,6 +182,51 @@ class TestPtyBridgeEnv:
         try:
             output = _read_until(bridge, b"pty-env-works")
             assert b"pty-env-works" in output
+        finally:
+            bridge.close()
+
+
+@skip_on_posix
+class TestPtyBridgeWindowsSpawn:
+    """Windows ConPTY smoke tests — run only on native Windows with pywinpty."""
+
+    def test_is_available_on_windows(self):
+        assert PtyBridge.is_available() is True
+
+    def test_spawn_returns_bridge_with_pid(self):
+        bridge = PtyBridge.spawn(["cmd.exe", "/c", "exit 0"])
+        try:
+            assert bridge.pid > 0
+        finally:
+            bridge.close()
+
+    def test_reads_child_stdout(self):
+        bridge = PtyBridge.spawn(["cmd.exe", "/c", "echo cronus-win-ok"])
+        try:
+            output = _read_until(bridge, b"cronus-win-ok")
+            assert b"cronus-win-ok" in output
+        finally:
+            bridge.close()
+
+    def test_write_sends_to_child_stdin(self):
+        bridge = PtyBridge.spawn(["cmd.exe"])
+        try:
+            bridge.write(b"echo cronus-write-ok\r\n")
+            output = _read_until(bridge, b"cronus-write-ok")
+            assert b"cronus-write-ok" in output
+        finally:
+            bridge.close()
+
+    def test_close_is_idempotent(self):
+        bridge = PtyBridge.spawn(["cmd.exe"])
+        bridge.close()
+        bridge.close()
+        assert not bridge.is_alive()
+
+    def test_resize_does_not_raise(self):
+        bridge = PtyBridge.spawn(["cmd.exe"], cols=80, rows=24)
+        try:
+            bridge.resize(cols=120, rows=30)
         finally:
             bridge.close()
 

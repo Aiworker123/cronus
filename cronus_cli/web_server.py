@@ -3350,14 +3350,15 @@ async def get_models_analytics(days: int = 30):
 import re
 import asyncio
 
-# PTY bridge is POSIX-only (depends on fcntl/termios/ptyprocess).  On native
-# Windows the import raises; catch and leave PtyBridge=None so the rest of
-# the dashboard (sessions, jobs, metrics, config editor) still loads and the
-# /api/pty endpoint cleanly refuses with a WSL-suggested message.
+# PTY bridge supports both POSIX (ptyprocess) and native Windows (pywinpty /
+# ConPTY).  The import should succeed on all supported platforms.  If it
+# fails (e.g. neither backend package is installed) we degrade gracefully:
+# the rest of the dashboard (sessions, jobs, metrics, config editor) still
+# loads and the /api/pty endpoint refuses with a clear error message.
 try:
     from cronus_cli.pty_bridge import PtyBridge, PtyUnavailableError
     _PTY_BRIDGE_AVAILABLE = True
-except ImportError as _pty_import_err:  # pragma: no cover - Windows-only path
+except ImportError as _pty_import_err:  # pragma: no cover - missing backend package
     PtyBridge = None  # type: ignore[assignment]
     _PTY_BRIDGE_AVAILABLE = False
 
@@ -3599,14 +3600,15 @@ async def pty_ws(ws: WebSocket) -> None:
 
     await ws.accept()
 
-    # On native Windows, the POSIX PTY bridge can't be imported.  Tell the
-    # client and close cleanly rather than pretending the feature works.
+    # PTY backend (ptyprocess on POSIX, pywinpty on Windows) failed to import.
+    # Tell the client and close cleanly rather than pretending the feature works.
     if not _PTY_BRIDGE_AVAILABLE:
         await ws.send_text(
-            "\r\n\x1b[31mChat unavailable: the embedded terminal requires a "
-            "POSIX PTY, which native Windows Python doesn't provide.\x1b[0m\r\n"
-            "\x1b[33mInstall Cronus inside WSL2 to use the dashboard's /chat "
-            "tab — the rest of the dashboard works here.\x1b[0m\r\n"
+            "\r\n\x1b[31mChat unavailable: the PTY backend package is not "
+            "installed.\x1b[0m\r\n"
+            "\x1b[33mOn Linux/macOS run: pip install ptyprocess\r\n"
+            "On Windows run: pip install pywinpty\r\n"
+            "Or reinstall with: pip install -e '.[pty]'\x1b[0m\r\n"
         )
         await ws.close(code=1011)
         return
