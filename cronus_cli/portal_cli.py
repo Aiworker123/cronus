@@ -37,9 +37,8 @@ def _nous_portal_base_url() -> str:
 
 
 def _cmd_status(args) -> int:
-    """Show Portal auth + Tool Gateway routing summary."""
+    """Show Portal auth status."""
     from cronus_cli.auth import get_nous_auth_status
-    from cronus_cli.nous_subscription import get_nous_subscription_features
 
     config = load_config() or {}
 
@@ -62,7 +61,6 @@ def _cmd_status(args) -> int:
             print(f"  API:     {inference}")
     else:
         print(f"  Auth:    {color('not logged in', Colors.YELLOW)}")
-        print(f"  Sign up: {SUBSCRIPTION_URL}")
         print(f"  Login:   cronus auth add nous --type oauth")
 
     # Provider selection (independent of auth)
@@ -73,38 +71,9 @@ def _cmd_status(args) -> int:
     elif provider:
         print(f"  Model:   currently {provider} (switch with `cronus model`)")
 
-    # Tool Gateway routing
     print()
-    print(color("  Tool Gateway", Colors.MAGENTA))
-    print(color("  ────────────", Colors.MAGENTA))
-    try:
-        features = get_nous_subscription_features(config)
-    except Exception:
-        features = None
-
-    if features is None:
-        print("  (could not resolve subscription state)")
-        return 0
-
-    rows = []
-    for feat in features.items():
-        if feat.managed_by_nous:
-            state = color("via Nous Portal", Colors.GREEN)
-        elif feat.active and feat.current_provider:
-            state = feat.current_provider
-        elif feat.active:
-            state = "active"
-        else:
-            state = color("not configured", Colors.DIM)
-        rows.append((feat.label, state))
-
-    width = max((len(r[0]) for r in rows), default=0)
-    for label, state in rows:
-        print(f"  {label:<{width}}   {state}")
-
-    if not logged_in:
-        print()
-        print(color(f"  Docs: {DOCS_URL}", Colors.DIM))
+    print(color("  Note: managed tool gateway is disabled. Tools require direct API keys.", Colors.DIM))
+    print(color(f"  Docs: {DOCS_URL}", Colors.DIM))
     return 0
 
 
@@ -124,50 +93,24 @@ def _cmd_open(args) -> int:
 
 
 def _cmd_tools(args) -> int:
-    """List the Tool Gateway catalog + current routing."""
-    from cronus_cli.nous_subscription import get_nous_subscription_features
+    """List available tools and their required API keys."""
+    print()
+    print(color("  Tool requirements", Colors.MAGENTA))
+    print(color("  ─────────────────", Colors.MAGENTA))
 
-    config = load_config() or {}
-    try:
-        features = get_nous_subscription_features(config)
-    except Exception:
-        print("Could not resolve Tool Gateway state.", file=sys.stderr)
-        return 1
-
-    # Static catalog — the partners Tool Gateway routes to today.
     catalog = [
-        ("web",       "Web search & extract",  "Firecrawl"),
-        ("image_gen", "Image generation",      "FAL"),
-        ("tts",       "Text-to-speech",        "OpenAI TTS"),
-        ("browser",   "Browser automation",    "Browser Use"),
-        ("modal",     "Cloud terminal",        "Modal"),
+        ("Web search & extract",  "FIRECRAWL_API_KEY / FIRECRAWL_API_URL / EXA_API_KEY / TAVILY_API_KEY"),
+        ("Image generation",      "FAL_KEY"),
+        ("Text-to-speech",        "OPENAI_API_KEY / ELEVENLABS_API_KEY (or Edge TTS — no key needed)"),
+        ("Browser automation",    "BROWSER_USE_API_KEY / BROWSERBASE_API_KEY or npm install -g agent-browser"),
+        ("Cloud terminal (Modal)","MODAL_TOKEN_ID + MODAL_TOKEN_SECRET (or run `modal setup`)"),
     ]
 
-    print()
-    print(color("  Tool Gateway catalog", Colors.MAGENTA))
-    print(color("  ────────────────────", Colors.MAGENTA))
-
-    if not features.nous_auth_present:
-        print(color("  Not logged into Nous Portal — sign in with `cronus auth add nous --type oauth`.", Colors.YELLOW))
-        print()
-
-    label_width = max(len(label) for _, label, _ in catalog)
-    for key, label, partner in catalog:
-        feat = features.features.get(key)
-        if feat is None:
-            state = color("unknown", Colors.DIM)
-        elif feat.managed_by_nous:
-            state = color("✓ via Nous Portal", Colors.GREEN)
-        elif feat.active and feat.current_provider:
-            state = feat.current_provider
-        elif feat.active:
-            state = "active"
-        else:
-            state = color("not configured", Colors.DIM)
-        print(f"  {label:<{label_width}}  partner: {partner:<14} {state}")
+    label_width = max(len(label) for label, _ in catalog)
+    for label, requirement in catalog:
+        print(f"  {label:<{label_width}}  {requirement}")
 
     print()
-    print(color(f"  Manage your subscription: {SUBSCRIPTION_URL}", Colors.DIM))
     print(color(f"  Docs: {DOCS_URL}", Colors.DIM))
     return 0
 

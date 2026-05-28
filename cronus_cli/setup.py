@@ -383,9 +383,7 @@ def _print_setup_summary(config: dict, cronus_home):
         tool_status.append(("Mixture of Agents", False, "OPENROUTER_API_KEY"))
 
     # Web tools (Exa, Parallel, Firecrawl, or Tavily)
-    if subscription_features.web.managed_by_nous:
-        tool_status.append(("Web Search & Extract (Nous subscription)", True, None))
-    elif subscription_features.web.available:
+    if subscription_features.web.available:
         label = "Web Search & Extract"
         if subscription_features.web.current_provider:
             label = f"Web Search & Extract ({subscription_features.web.current_provider})"
@@ -395,9 +393,7 @@ def _print_setup_summary(config: dict, cronus_home):
 
     # Browser tools (local Chromium, Camofox, Browserbase, Browser Use, or Firecrawl)
     browser_provider = subscription_features.browser.current_provider
-    if subscription_features.browser.managed_by_nous:
-        tool_status.append(("Browser Automation (Nous Browser Use)", True, None))
-    elif subscription_features.browser.available:
+    if subscription_features.browser.available:
         label = "Browser Automation"
         if browser_provider:
             label = f"Browser Automation ({browser_provider})"
@@ -421,11 +417,8 @@ def _print_setup_summary(config: dict, cronus_home):
             ("Browser Automation", False, missing_browser_hint)
         )
 
-    # Image generation — FAL (direct or via Nous), or any plugin-registered
-    # provider (OpenAI, etc.)
-    if subscription_features.image_gen.managed_by_nous:
-        tool_status.append(("Image Generation (Nous subscription)", True, None))
-    elif subscription_features.image_gen.available:
+    # Image generation — FAL (direct), or any plugin-registered provider (OpenAI, etc.)
+    if subscription_features.image_gen.available:
         tool_status.append(("Image Generation", True, None))
     else:
         # Fall back to probing plugin-registered providers so OpenAI-only
@@ -474,9 +467,7 @@ def _print_setup_summary(config: dict, cronus_home):
 
     # TTS — show configured provider
     tts_provider = cfg_get(config, "tts", "provider", default="edge")
-    if subscription_features.tts.managed_by_nous:
-        tool_status.append(("Text-to-Speech (OpenAI via Nous subscription)", True, None))
-    elif tts_provider == "elevenlabs" and get_env_value("ELEVENLABS_API_KEY"):
+    if tts_provider == "elevenlabs" and get_env_value("ELEVENLABS_API_KEY"):
         tool_status.append(("Text-to-Speech (ElevenLabs)", True, None))
     elif tts_provider == "openai" and (
         get_env_value("VOICE_TOOLS_OPENAI_KEY") or get_env_value("OPENAI_API_KEY")
@@ -510,15 +501,11 @@ def _print_setup_summary(config: dict, cronus_home):
     else:
         tool_status.append(("Text-to-Speech (Edge TTS)", True, None))
 
-    if subscription_features.modal.managed_by_nous:
-        tool_status.append(("Modal Execution (Nous subscription)", True, None))
-    elif cfg_get(config, "terminal", "backend") == "modal":
+    if cfg_get(config, "terminal", "backend") == "modal":
         if subscription_features.modal.direct_override:
             tool_status.append(("Modal Execution (direct Modal)", True, None))
         else:
             tool_status.append(("Modal Execution", False, "run 'cronus setup terminal'"))
-    elif managed_nous_tools_enabled() and subscription_features.nous_auth_present:
-        tool_status.append(("Modal Execution (optional via Nous subscription)", True, None))
 
     # Home Assistant
     if get_env_value("HASS_TOKEN"):

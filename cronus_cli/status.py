@@ -17,13 +17,10 @@ from cronus_cli.colors import Colors, color
 from cronus_cli.config import get_env_path, get_env_value, get_cronus_home, load_config
 from cronus_cli.models import provider_label
 from cronus_cli.nous_account import (
-    format_nous_portal_entitlement_message,
     get_nous_portal_account_info,
 )
-from cronus_cli.nous_subscription import get_nous_subscription_features
 from cronus_cli.runtime_provider import resolve_requested_provider
 from cronus_constants import OPENROUTER_MODELS_URL
-from tools.tool_backend_helpers import managed_nous_tools_enabled
 
 def check_mark(ok: bool) -> str:
     if ok:
@@ -314,42 +311,6 @@ def show_status(args):
     if xai_oauth_status.get("error") and not xai_oauth_logged_in:
         print(f"    Error:      {xai_oauth_status.get('error')}")
 
-    # =========================================================================
-    # Nous Subscription Features
-    # =========================================================================
-    if managed_nous_tools_enabled():
-        features = get_nous_subscription_features(config)
-        print()
-        print(color("◆ Nous Tool Gateway", Colors.CYAN, Colors.BOLD))
-        if not features.nous_auth_present:
-            print("  Nous Portal   ✗ not logged in")
-        else:
-            print("  Nous Portal   ✓ managed tools available")
-        for feature in features.items():
-            if feature.managed_by_nous:
-                state = "active via Nous subscription"
-            elif feature.active:
-                current = feature.current_provider or "configured provider"
-                state = f"active via {current}"
-            elif feature.included_by_default and features.nous_auth_present:
-                state = "included by subscription, not currently selected"
-            elif feature.key == "modal" and features.nous_auth_present:
-                state = "available via subscription (optional)"
-            else:
-                state = "not configured"
-            print(f"  {feature.label:<15} {check_mark(feature.available or feature.active or feature.managed_by_nous)} {state}")
-    elif nous_logged_in or nous_inference_present:
-        # Nous OAuth without entitlement, or an opaque inference key without
-        # Portal account information, cannot enable the Tool Gateway.
-        print()
-        print(color("◆ Nous Tool Gateway", Colors.CYAN, Colors.BOLD))
-        message = format_nous_portal_entitlement_message(
-            nous_account_info,
-            capability="managed web, image, TTS, browser, and Modal tools",
-        )
-        if message:
-            for line in message.splitlines():
-                print(f"  {line}")
 
     # =========================================================================
     # API-Key Providers

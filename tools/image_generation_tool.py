@@ -58,15 +58,11 @@ def _load_fal_client() -> Any:
 
 from tools.debug_helpers import DebugSession
 from tools.fal_common import (
-    _ManagedFalSyncClient,
     _extract_http_status,
     _normalize_fal_queue_url_format,  # noqa: F401 — re-exported for tests
 )
-from tools.managed_tool_gateway import resolve_managed_tool_gateway
 from tools.tool_backend_helpers import (
     fal_key_is_configured,
-    managed_nous_tools_enabled,
-    nous_tool_gateway_unavailable_message,
     prefers_gateway,
 )
 
@@ -772,30 +768,15 @@ def _build_no_backend_setup_message() -> str:
     """
     lines = ["Image generation is unavailable in this environment.", ""]
     lines.append("Missing requirements:")
-    if managed_nous_tools_enabled():
-        lines.append(
-            "  - FAL_KEY is not set and the managed FAL gateway is unreachable"
-        )
-    else:
-        lines.append("  - FAL_KEY environment variable is not set")
-        gateway_message = nous_tool_gateway_unavailable_message(
-            "managed FAL image generation",
-        )
-        if gateway_message:
-            lines.append(f"  - {gateway_message}")
+    lines.append("  - FAL_KEY environment variable is not set")
     lines.append("")
     lines.append("To enable image generation, do one of:")
     lines.append(
         "  1. Get a free API key at https://fal.ai and set "
         "FAL_KEY=<your-key> (then restart the session)"
     )
-    if managed_nous_tools_enabled():
-        lines.append(
-            "  2. Sign in to a Nous account that has the managed FAL "
-            "gateway enabled (`cronus setup`)"
-        )
     lines.append(
-        "  3. Configure a different image_gen provider via `cronus tools` "
+        "  2. Configure a different image_gen provider via `cronus tools` "
         "→ Image Generation (run `cronus plugins list` to see installed "
         "backends)"
     )

@@ -134,24 +134,8 @@ def resolve_managed_tool_gateway(
     gateway_builder: Optional[Callable[[str], str]] = None,
     token_reader: Optional[Callable[[], Optional[str]]] = None,
 ) -> Optional[ManagedToolGatewayConfig]:
-    """Resolve shared managed-tool gateway config for a vendor."""
-    if not managed_nous_tools_enabled():
-        return None
-
-    resolved_gateway_builder = gateway_builder or build_vendor_gateway_url
-    resolved_token_reader = token_reader or read_nous_access_token
-
-    gateway_origin = resolved_gateway_builder(vendor)
-    nous_user_token = resolved_token_reader()
-    if not gateway_origin or not nous_user_token:
-        return None
-
-    return ManagedToolGatewayConfig(
-        vendor=vendor,
-        gateway_origin=gateway_origin,
-        nous_user_token=nous_user_token,
-        managed_mode=True,
-    )
+    """Managed tool gateway is disabled. Users must provide their own API keys."""
+    return None
 
 
 def is_managed_tool_gateway_ready(
@@ -159,9 +143,5 @@ def is_managed_tool_gateway_ready(
     gateway_builder: Optional[Callable[[str], str]] = None,
     token_reader: Optional[Callable[[], Optional[str]]] = None,
 ) -> bool:
-    """Return True when gateway URL and Nous access token are available."""
-    return resolve_managed_tool_gateway(
-        vendor,
-        gateway_builder=gateway_builder,
-        token_reader=token_reader,
-    ) is not None
+    """Managed tool gateway is disabled. Returns False always."""
+    return False

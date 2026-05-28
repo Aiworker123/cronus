@@ -15,51 +15,20 @@ _VALID_MODAL_MODES = {"auto", "direct", "managed"}
 
 
 def managed_nous_tools_enabled(*, force_fresh: bool = False) -> bool:
-    """Return True when the user has paid Nous Portal service access.
-
-    Tool Gateway availability fails closed on unknown/error entitlement.  We
-    intentionally catch all exceptions and return False — never block startup.
-    ``force_fresh=True`` is for interactive configuration flows that should
-    reflect a just-purchased subscription or credits immediately.
-    """
-    try:
-        from cronus_cli.nous_account import get_nous_portal_account_info
-
-        if force_fresh:
-            account_info = get_nous_portal_account_info(force_fresh=True)
-        else:
-            account_info = get_nous_portal_account_info()
-        if not account_info.logged_in:
-            return False
-        return account_info.paid_service_access is True
-    except Exception:
-        return False
+    """Managed Nous tool gateway is disabled. Users must provide their own API keys."""
+    return False
 
 
 def nous_tool_gateway_unavailable_message(
-    capability: str = "the Nous Tool Gateway",
+    capability: str = "the tool",
     *,
     force_fresh: bool = False,
 ) -> str:
-    """Return account-aware guidance for an unavailable Nous Tool Gateway path."""
-    try:
-        from cronus_cli.nous_account import (
-            format_nous_portal_entitlement_message,
-            get_nous_portal_account_info,
-        )
-
-        account_info = get_nous_portal_account_info(force_fresh=force_fresh)
-        message = format_nous_portal_entitlement_message(
-            account_info,
-            capability=capability,
-        )
-        if message:
-            return message
-    except Exception:
-        pass
+    """Return guidance directing users to provide their own API key."""
     return (
-        f"{capability} is unavailable. Run `cronus model` to refresh your "
-        "Nous Portal login and billing status."
+        f"{capability} requires a direct API key. "
+        "Please set the appropriate environment variable (e.g. FIRECRAWL_API_KEY, "
+        "FAL_KEY, OPENAI_API_KEY, BROWSER_USE_API_KEY) and restart."
     )
 
 

@@ -50,7 +50,7 @@ import threading
 import uuid
 from pathlib import Path
 from typing import Callable, Dict, Any, Optional
-from urllib.parse import urljoin
+
 
 from cronus_constants import display_cronus_home
 
@@ -68,11 +68,7 @@ def get_env_value(name, default=None):
         return os.getenv(name, default)
     value = _get_env_value(name)
     return default if value is None else value
-from tools.managed_tool_gateway import resolve_managed_tool_gateway
 from tools.tool_backend_helpers import (
-    managed_nous_tools_enabled,
-    nous_tool_gateway_unavailable_message,
-    prefers_gateway,
     resolve_openai_audio_api_key,
 )
 from tools.xai_http import cronus_xai_user_agent
@@ -2205,29 +2201,18 @@ def _resolve_openai_audio_client_config() -> tuple[str, str]:
     even if direct OpenAI credentials are present.
     """
     direct_api_key = resolve_openai_audio_api_key()
-    if direct_api_key and not prefers_gateway("tts"):
+    if direct_api_key:
         return direct_api_key, DEFAULT_OPENAI_BASE_URL
 
-    managed_gateway = resolve_managed_tool_gateway("openai-audio")
-    if managed_gateway is None:
-        message = "Neither VOICE_TOOLS_OPENAI_KEY nor OPENAI_API_KEY is set"
-        if managed_nous_tools_enabled() or prefers_gateway("tts"):
-            message += (
-                ". "
-                + nous_tool_gateway_unavailable_message(
-                    "managed OpenAI audio for TTS",
-                )
-            )
-        raise ValueError(message)
-
-    return managed_gateway.nous_user_token, urljoin(
-        f"{managed_gateway.gateway_origin.rstrip('/')}/", "v1"
+    raise ValueError(
+        "Neither VOICE_TOOLS_OPENAI_KEY nor OPENAI_API_KEY is set. "
+        "Please set OPENAI_API_KEY to use OpenAI TTS."
     )
 
 
 def _has_openai_audio_backend() -> bool:
-    """Return True when OpenAI audio can use direct credentials or the managed gateway."""
-    return bool(resolve_openai_audio_api_key() or resolve_managed_tool_gateway("openai-audio"))
+    """Return True when OpenAI audio direct credentials are available."""
+    return bool(resolve_openai_audio_api_key())
 
 
 # ===========================================================================
