@@ -107,6 +107,17 @@ pty = [
   "ptyprocess==0.7.0; sys_platform != 'win32'",
   "pywinpty==2.0.15; sys_platform == 'win32'",
 ]
+# Windows native development bundle.
+# Convenience: pip install -e ".[windows]"  (or uv pip install -e ".[windows]")
+# Pulls in every dep the Windows ConPTY backend, process management, and
+# Windows API integration need.  Safe to install on any platform — all
+# entries carry sys_platform == 'win32' markers so non-Windows resolvers
+# silently skip them.
+windows = [
+  "cronus-agent[pty]",
+  "psutil==7.2.2; sys_platform == 'win32'",
+  "pywin32==308; sys_platform == 'win32'",
+]
 honcho = ["honcho-ai==2.0.1"]
 mcp = ["mcp==1.26.0"]
 homeassistant = ["aiohttp==3.13.3"]
