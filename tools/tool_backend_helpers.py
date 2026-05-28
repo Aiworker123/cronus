@@ -14,24 +14,6 @@ _DEFAULT_MODAL_MODE = "auto"
 _VALID_MODAL_MODES = {"auto", "direct", "managed"}
 
 
-def managed_nous_tools_enabled(*, force_fresh: bool = False) -> bool:
-    """Managed Nous tool gateway is disabled. Users must provide their own API keys."""
-    return False
-
-
-def nous_tool_gateway_unavailable_message(
-    capability: str = "the tool",
-    *,
-    force_fresh: bool = False,
-) -> str:
-    """Return guidance directing users to provide their own API key."""
-    return (
-        f"{capability} requires a direct API key. "
-        "Please set the appropriate environment variable (e.g. FIRECRAWL_API_KEY, "
-        "FAL_KEY, OPENAI_API_KEY, BROWSER_USE_API_KEY) and restart."
-    )
-
-
 def normalize_browser_cloud_provider(value: object | None) -> str:
     """Return a normalized browser provider key."""
     provider = str(value or _DEFAULT_BROWSER_PROVIDER).strip().lower()
@@ -63,37 +45,31 @@ def resolve_modal_backend_state(
     modal_mode: object | None,
     *,
     has_direct: bool,
-    managed_ready: bool,
+    managed_ready: bool = False,
     managed_enabled: bool | None = None,
 ) -> Dict[str, Any]:
-    """Resolve direct vs managed Modal backend selection.
+    """Resolve direct Modal backend selection.
 
     Semantics:
-    - ``direct`` means direct-only
-    - ``managed`` means managed-only
-    - ``auto`` prefers managed when available, then falls back to direct
+    - ``direct`` or ``auto`` → direct when credentials are available
+    - ``managed`` → no longer supported; treated as unavailable
     """
     requested_mode = coerce_modal_mode(modal_mode)
     normalized_mode = normalize_modal_mode(modal_mode)
-    if managed_enabled is None:
-        managed_enabled = managed_nous_tools_enabled()
-    managed_mode_blocked = (
-        requested_mode == "managed" and not managed_enabled
-    )
 
-    if normalized_mode == "managed":
-        selected_backend = "managed" if managed_enabled and managed_ready else None
-    elif normalized_mode == "direct":
+    if normalized_mode == "direct":
         selected_backend = "direct" if has_direct else None
-    else:
-        selected_backend = "managed" if managed_enabled and managed_ready else "direct" if has_direct else None
+    elif normalized_mode == "managed":
+        selected_backend = None  # managed mode no longer supported
+    else:  # auto
+        selected_backend = "direct" if has_direct else None
 
     return {
         "requested_mode": requested_mode,
         "mode": normalized_mode,
         "has_direct": has_direct,
-        "managed_ready": managed_ready,
-        "managed_mode_blocked": managed_mode_blocked,
+        "managed_ready": False,
+        "managed_mode_blocked": normalized_mode == "managed",
         "selected_backend": selected_backend,
     }
 
@@ -105,20 +81,6 @@ def resolve_openai_audio_api_key() -> str:
         or os.getenv("OPENAI_API_KEY", "")
     ).strip()
 
-
-def prefers_gateway(config_section: str) -> bool:
-    """Return True when the user opted into the Tool Gateway for this tool.
-
-    Reads ``<section>.use_gateway`` from config.yaml.  Never raises.
-    """
-    try:
-        from cronus_cli.config import load_config
-        section = (load_config() or {}).get(config_section)
-        if isinstance(section, dict):
-            return is_truthy_value(section.get("use_gateway"), default=False)
-    except Exception:
-        pass
-    return False
 
 
 def fal_key_is_configured() -> bool:

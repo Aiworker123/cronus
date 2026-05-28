@@ -1,0 +1,1 @@
+- [Gateway removal](gateway-removal.md) — Nous subscription/managed tool gateway fully removed; all tools now require direct API keys from users.

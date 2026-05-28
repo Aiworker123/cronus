@@ -822,8 +822,6 @@ from tools.environments.singularity import SingularityEnvironment as _Singularit
 from tools.environments.ssh import SSHEnvironment as _SSHEnvironment
 from tools.environments.docker import DockerEnvironment as _DockerEnvironment
 from tools.environments.modal import ModalEnvironment as _ModalEnvironment
-from tools.environments.managed_modal import ManagedModalEnvironment as _ManagedModalEnvironment
-from tools.managed_tool_gateway import is_managed_tool_gateway_ready
 import sys
 
 
@@ -1026,11 +1024,10 @@ def _get_env_config() -> Dict[str, Any]:
 
 
 def _get_modal_backend_state(modal_mode: object | None) -> Dict[str, Any]:
-    """Resolve direct vs managed Modal backend selection."""
+    """Resolve direct Modal backend selection."""
     return resolve_modal_backend_state(
         modal_mode,
         has_direct=has_direct_modal_credentials(),
-        managed_ready=is_managed_tool_gateway_ready("modal"),
     )
 
 
@@ -1105,13 +1102,6 @@ def _create_environment(env_type: str, image: str, cwd: str, timeout: int,
                 pass
 
         modal_state = _get_modal_backend_state(cc.get("modal_mode"))
-
-        if modal_state["selected_backend"] == "managed":
-            return _ManagedModalEnvironment(
-                image=image, cwd=cwd, timeout=timeout,
-                modal_sandbox_kwargs=sandbox_kwargs,
-                persistent_filesystem=persistent, task_id=task_id,
-            )
 
         if modal_state["selected_backend"] != "direct":
             if modal_state["mode"] == "direct":

@@ -1,19 +1,17 @@
-"""Helpers for Nous subscription managed-tool capabilities."""
+"""Helpers for Nous tool availability and feature state."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Set
+from typing import Dict, Optional
 
 from cronus_cli.config import get_env_value, load_config
 from cronus_cli.nous_account import NousPortalAccountInfo, get_nous_portal_account_info
-from tools.managed_tool_gateway import is_managed_tool_gateway_ready
 from utils import is_truthy_value
 from tools.tool_backend_helpers import (
     fal_key_is_configured,
     has_direct_modal_credentials,
-    managed_nous_tools_enabled,
     normalize_browser_cloud_provider,
     normalize_modal_mode,
     resolve_modal_backend_state,
@@ -245,11 +243,6 @@ def get_nous_subscription_features(
     except Exception:
         account_info = None
 
-    managed_tools_flag = bool(
-        account_info
-        and account_info.logged_in
-        and account_info.paid_service_access is True
-    )
     nous_auth_present = bool(account_info and account_info.logged_in)
     subscribed = provider_is_nous or nous_auth_present
 
@@ -268,7 +261,6 @@ def get_nous_subscription_features(
     # Per-capability overrides: if set, they determine which backend is active for
     # search/extract independently of web.backend.
     web_search_backend = str(web_cfg.get("search_backend") or "").strip().lower()
-    web_extract_backend = str(web_cfg.get("extract_backend") or "").strip().lower()
     tts_provider = str(tts_cfg.get("provider") or "edge").strip().lower()
     browser_provider_explicit = "cloud_provider" in browser_cfg
     browser_provider = normalize_browser_cloud_provider(
@@ -280,15 +272,6 @@ def get_nous_subscription_features(
     modal_mode = normalize_modal_mode(
         terminal_cfg.get("modal_mode")
     )
-
-    # use_gateway flags — when True, the user explicitly opted into the
-    # Tool Gateway via `cronus model`, so direct credentials should NOT
-    # prevent gateway routing.
-    web_use_gateway = _uses_gateway(web_cfg)
-    tts_use_gateway = _uses_gateway(tts_cfg)
-    browser_use_gateway = _uses_gateway(browser_cfg)
-    image_gen_cfg = config.get("image_gen") if isinstance(config.get("image_gen"), dict) else {}
-    image_use_gateway = _uses_gateway(image_gen_cfg)
 
     direct_exa = bool(get_env_value("EXA_API_KEY"))
     direct_firecrawl = bool(get_env_value("FIRECRAWL_API_KEY") or get_env_value("FIRECRAWL_API_URL"))
@@ -303,39 +286,15 @@ def get_nous_subscription_features(
     direct_browser_use = bool(get_env_value("BROWSER_USE_API_KEY"))
     direct_modal = has_direct_modal_credentials()
 
-    # When use_gateway is set, suppress direct credentials for managed detection
-    if web_use_gateway:
-        direct_firecrawl = False
-        direct_exa = False
-        direct_parallel = False
-        direct_tavily = False
-    if image_use_gateway:
-        direct_fal = False
-    if tts_use_gateway:
-        direct_openai_tts = False
-        direct_elevenlabs = False
-    if browser_use_gateway:
-        direct_browser_use = False
-        direct_browserbase = False
-
-    managed_web_available = managed_tools_flag and nous_auth_present and is_managed_tool_gateway_ready("firecrawl")
-    managed_image_available = managed_tools_flag and nous_auth_present and is_managed_tool_gateway_ready("fal-queue")
-    managed_tts_available = managed_tools_flag and nous_auth_present and is_managed_tool_gateway_ready("openai-audio")
-    managed_browser_available = managed_tools_flag and nous_auth_present and is_managed_tool_gateway_ready("browser-use")
-    managed_modal_available = managed_tools_flag and nous_auth_present and is_managed_tool_gateway_ready("modal")
     modal_state = resolve_modal_backend_state(
         modal_mode,
         has_direct=direct_modal,
-        managed_ready=managed_modal_available,
-        managed_enabled=managed_tools_flag,
     )
 
-    web_managed = web_backend == "firecrawl" and managed_web_available and not direct_firecrawl
     web_active = bool(
         web_tool_enabled
         and (
-            web_managed
-            or (web_backend == "exa" and direct_exa)
+            (web_backend == "exa" and direct_exa)
             or (web_backend == "firecrawl" and direct_firecrawl)
             or (web_backend == "parallel" and direct_parallel)
             or (web_backend == "tavily" and direct_tavily)
@@ -349,24 +308,15 @@ def get_nous_subscription_features(
             or (web_search_backend == "tavily" and direct_tavily)
         )
     )
-    web_available = bool(
-        managed_web_available or direct_exa or direct_firecrawl or direct_parallel or direct_tavily or direct_searxng
-    )
+    web_available = bool(direct_exa or direct_firecrawl or direct_parallel or direct_tavily or direct_searxng)
 
-    image_managed = image_tool_enabled and managed_image_available and not direct_fal
-    image_active = bool(image_tool_enabled and (image_managed or direct_fal))
-    image_available = bool(managed_image_available or direct_fal)
+    image_active = bool(image_tool_enabled and direct_fal)
+    image_available = bool(direct_fal)
 
     tts_current_provider = tts_provider or "edge"
-    tts_managed = (
-        tts_tool_enabled
-        and tts_current_provider == "openai"
-        and managed_tts_available
-        and not direct_openai_tts
-    )
     tts_available = bool(
         tts_current_provider in {"edge", "neutts"}
-        or (tts_current_provider == "openai" and (managed_tts_available or direct_openai_tts))
+        or (tts_current_provider == "openai" and direct_openai_tts)
         or (tts_current_provider == "elevenlabs" and direct_elevenlabs)
         or (tts_current_provider == "mistral" and bool(get_env_value("MISTRAL_API_KEY")))
     )
@@ -387,37 +337,23 @@ def get_nous_subscription_features(
         direct_browserbase=direct_browserbase,
         direct_browser_use=direct_browser_use,
         direct_firecrawl=direct_firecrawl,
-        managed_browser_available=managed_browser_available,
+        managed_browser_available=False,
     )
 
     if terminal_backend != "modal":
-        modal_managed = False
-        modal_available = True
-        modal_active = bool(modal_tool_enabled)
-        modal_direct_override = False
-    elif modal_state["selected_backend"] == "managed":
-        modal_managed = bool(modal_tool_enabled)
         modal_available = True
         modal_active = bool(modal_tool_enabled)
         modal_direct_override = False
     elif modal_state["selected_backend"] == "direct":
-        modal_managed = False
         modal_available = True
         modal_active = bool(modal_tool_enabled)
         modal_direct_override = bool(modal_tool_enabled)
-    elif modal_mode == "managed":
-        modal_managed = False
-        modal_available = bool(managed_modal_available)
-        modal_active = False
-        modal_direct_override = False
     elif modal_mode == "direct":
-        modal_managed = False
         modal_available = bool(direct_modal)
         modal_active = False
         modal_direct_override = False
     else:
-        modal_managed = False
-        modal_available = bool(managed_modal_available or direct_modal)
+        modal_available = bool(direct_modal)
         modal_active = False
         modal_direct_override = False
 
@@ -433,8 +369,8 @@ def get_nous_subscription_features(
             included_by_default=True,
             available=web_available,
             active=web_active,
-            managed_by_nous=web_managed,
-            direct_override=web_active and not web_managed,
+            managed_by_nous=False,
+            direct_override=web_active,
             toolset_enabled=web_tool_enabled,
             current_provider=web_backend or web_search_backend or "",
             explicit_configured=bool(web_backend or web_search_backend),
@@ -445,10 +381,10 @@ def get_nous_subscription_features(
             included_by_default=True,
             available=image_available,
             active=image_active,
-            managed_by_nous=image_managed,
-            direct_override=image_active and not image_managed,
+            managed_by_nous=False,
+            direct_override=image_active,
             toolset_enabled=image_tool_enabled,
-            current_provider="FAL" if direct_fal else ("Nous Subscription" if image_managed else ""),
+            current_provider="FAL" if direct_fal else "",
             explicit_configured=direct_fal,
         ),
         "tts": NousFeatureState(
@@ -457,8 +393,8 @@ def get_nous_subscription_features(
             included_by_default=True,
             available=tts_available,
             active=tts_active,
-            managed_by_nous=tts_managed,
-            direct_override=tts_active and not tts_managed,
+            managed_by_nous=False,
+            direct_override=tts_active,
             toolset_enabled=tts_tool_enabled,
             current_provider=_tts_label(tts_current_provider),
             explicit_configured=tts_explicit_configured,
@@ -469,7 +405,7 @@ def get_nous_subscription_features(
             included_by_default=True,
             available=browser_available,
             active=browser_active,
-            managed_by_nous=browser_managed,
+            managed_by_nous=False,
             direct_override=browser_active and not browser_managed,
             toolset_enabled=browser_tool_enabled,
             current_provider=_browser_label(browser_current_provider),
@@ -481,7 +417,7 @@ def get_nous_subscription_features(
             included_by_default=False,
             available=modal_available,
             active=modal_active,
-            managed_by_nous=modal_managed,
+            managed_by_nous=False,
             direct_override=terminal_backend == "modal" and modal_direct_override,
             toolset_enabled=modal_tool_enabled,
             current_provider="Modal" if terminal_backend == "modal" else terminal_backend or "local",
@@ -501,328 +437,5 @@ def get_nous_subscription_features(
 
 
 
-def apply_nous_managed_defaults(
-    config: Dict[str, object],
-    *,
-    enabled_toolsets: Optional[Iterable[str]] = None,
-    force_fresh: bool = False,
-) -> set[str]:
-    features = get_nous_subscription_features(config, force_fresh=force_fresh)
-    if not (
-        features.account_info
-        and features.account_info.logged_in
-        and features.account_info.paid_service_access is True
-    ):
-        return set()
-    if not features.provider_is_nous:
-        return set()
-
-    selected_toolsets = set(enabled_toolsets or ())
-    changed: set[str] = set()
-
-    web_cfg = config.get("web")
-    if not isinstance(web_cfg, dict):
-        web_cfg = {}
-        config["web"] = web_cfg
-
-    tts_cfg = config.get("tts")
-    if not isinstance(tts_cfg, dict):
-        tts_cfg = {}
-        config["tts"] = tts_cfg
-
-    browser_cfg = config.get("browser")
-    if not isinstance(browser_cfg, dict):
-        browser_cfg = {}
-        config["browser"] = browser_cfg
-
-    if "web" in selected_toolsets and not features.web.explicit_configured and not (
-        get_env_value("PARALLEL_API_KEY")
-        or get_env_value("TAVILY_API_KEY")
-        or get_env_value("FIRECRAWL_API_KEY")
-        or get_env_value("FIRECRAWL_API_URL")
-    ):
-        web_cfg["backend"] = "firecrawl"
-        changed.add("web")
-
-    if "tts" in selected_toolsets and not features.tts.explicit_configured and not (
-        resolve_openai_audio_api_key()
-        or get_env_value("ELEVENLABS_API_KEY")
-    ):
-        tts_cfg["provider"] = "openai"
-        changed.add("tts")
-
-    if "browser" in selected_toolsets and not features.browser.explicit_configured and not (
-        get_env_value("BROWSER_USE_API_KEY")
-        or get_env_value("BROWSERBASE_API_KEY")
-    ):
-        browser_cfg["cloud_provider"] = "browser-use"
-        changed.add("browser")
-
-    if "image_gen" in selected_toolsets and not fal_key_is_configured():
-        changed.add("image_gen")
-
-    return changed
 
 
-# ---------------------------------------------------------------------------
-# Tool Gateway offer — single Y/n prompt after model selection
-# ---------------------------------------------------------------------------
-
-_GATEWAY_TOOL_LABELS = {
-    "web": "Web search & extract (Firecrawl)",
-    "image_gen": "Image generation (FAL)",
-    "tts": "Text-to-speech (OpenAI TTS)",
-    "browser": "Browser automation (Browser Use)",
-}
-
-
-def _get_gateway_direct_credentials() -> Dict[str, bool]:
-    """Return a dict of tool_key -> has_direct_credentials."""
-    return {
-        "web": bool(
-            get_env_value("FIRECRAWL_API_KEY")
-            or get_env_value("FIRECRAWL_API_URL")
-            or get_env_value("PARALLEL_API_KEY")
-            or get_env_value("TAVILY_API_KEY")
-            or get_env_value("EXA_API_KEY")
-        ),
-        "image_gen": fal_key_is_configured(),
-        "tts": bool(
-            resolve_openai_audio_api_key()
-            or get_env_value("ELEVENLABS_API_KEY")
-        ),
-        "browser": bool(
-            get_env_value("BROWSER_USE_API_KEY")
-            or (get_env_value("BROWSERBASE_API_KEY") and get_env_value("BROWSERBASE_PROJECT_ID"))
-        ),
-    }
-
-
-_GATEWAY_DIRECT_LABELS = {
-    "web": "Firecrawl/Exa/Parallel/Tavily key",
-    "image_gen": "FAL key",
-    "tts": "OpenAI/ElevenLabs key",
-    "browser": "Browser Use/Browserbase key",
-}
-
-_ALL_GATEWAY_KEYS = ("web", "image_gen", "tts", "browser")
-
-
-def get_gateway_eligible_tools(
-    config: Optional[Dict[str, object]] = None,
-    *,
-    force_fresh: bool = False,
-) -> tuple[list[str], list[str], list[str]]:
-    """Return (unconfigured, has_direct, already_managed) tool key lists.
-
-    - unconfigured: tools with no direct credentials (easy switch)
-    - has_direct: tools where the user has their own API keys
-    - already_managed: tools already routed through the gateway
-
-    All lists are empty when the user is not a paid Nous subscriber or
-    is not using Nous as their provider.
-    """
-    if force_fresh:
-        managed_enabled = managed_nous_tools_enabled(force_fresh=True)
-    else:
-        managed_enabled = managed_nous_tools_enabled()
-    if not managed_enabled:
-        return [], [], []
-
-    if config is None:
-        config = load_config() or {}
-
-    # Quick provider check without the heavy get_nous_subscription_features call
-    model_cfg = config.get("model")
-    if not isinstance(model_cfg, dict) or str(model_cfg.get("provider") or "").strip().lower() != "nous":
-        return [], [], []
-
-    direct = _get_gateway_direct_credentials()
-
-    # Check which tools the user has explicitly opted into the gateway for.
-    # This is distinct from managed_by_nous which fires implicitly when
-    # no direct keys exist — we only skip the prompt for tools where
-    # use_gateway was explicitly set.
-    opted_in = {
-        "web": _uses_gateway(config.get("web")),
-        "image_gen": _uses_gateway(config.get("image_gen")),
-        "tts": _uses_gateway(config.get("tts")),
-        "browser": _uses_gateway(config.get("browser")),
-    }
-
-    unconfigured: list[str] = []
-    has_direct: list[str] = []
-    already_managed: list[str] = []
-    for key in _ALL_GATEWAY_KEYS:
-        if opted_in.get(key):
-            already_managed.append(key)
-        elif direct.get(key):
-            has_direct.append(key)
-        else:
-            unconfigured.append(key)
-    return unconfigured, has_direct, already_managed
-
-
-def apply_gateway_defaults(
-    config: Dict[str, object],
-    tool_keys: list[str],
-) -> set[str]:
-    """Apply Tool Gateway config for the given tool keys.
-
-    Sets ``use_gateway: true`` in each tool's config section so the
-    runtime prefers the gateway even when direct API keys are present.
-
-    Returns the set of tools that were actually changed.
-    """
-    changed: set[str] = set()
-
-    web_cfg = config.get("web")
-    if not isinstance(web_cfg, dict):
-        web_cfg = {}
-        config["web"] = web_cfg
-
-    tts_cfg = config.get("tts")
-    if not isinstance(tts_cfg, dict):
-        tts_cfg = {}
-        config["tts"] = tts_cfg
-
-    browser_cfg = config.get("browser")
-    if not isinstance(browser_cfg, dict):
-        browser_cfg = {}
-        config["browser"] = browser_cfg
-
-    if "web" in tool_keys:
-        web_cfg["backend"] = "firecrawl"
-        web_cfg["use_gateway"] = True
-        changed.add("web")
-
-    if "tts" in tool_keys:
-        tts_cfg["provider"] = "openai"
-        tts_cfg["use_gateway"] = True
-        changed.add("tts")
-
-    if "browser" in tool_keys:
-        browser_cfg["cloud_provider"] = "browser-use"
-        browser_cfg["use_gateway"] = True
-        changed.add("browser")
-
-    if "image_gen" in tool_keys:
-        image_cfg = config.get("image_gen")
-        if not isinstance(image_cfg, dict):
-            image_cfg = {}
-            config["image_gen"] = image_cfg
-        image_cfg["use_gateway"] = True
-        changed.add("image_gen")
-
-    return changed
-
-
-def prompt_enable_tool_gateway(
-    config: Dict[str, object],
-    *,
-    force_fresh: bool = True,
-) -> set[str]:
-    """If eligible tools exist, prompt the user to enable the Tool Gateway.
-
-    Uses prompt_choice() with a description parameter so the curses TUI
-    shows the tool context alongside the choices.
-
-    Returns the set of tools that were enabled, or empty set if the user
-    declined or no tools were eligible.
-    """
-    unconfigured, has_direct, already_managed = get_gateway_eligible_tools(
-        config,
-        force_fresh=force_fresh,
-    )
-    if not unconfigured and not has_direct:
-        return set()
-
-    try:
-        from cronus_cli.setup import prompt_choice
-    except Exception:
-        return set()
-
-    # Build description lines showing full status of all gateway tools
-    desc_parts: list[str] = [
-        "",
-        "  The Tool Gateway gives you access to web search, image generation,",
-        "  text-to-speech, and browser automation through your Nous subscription.",
-        "  No need to sign up for separate API keys — just pick the tools you want.",
-        "",
-    ]
-    if already_managed:
-        for k in already_managed:
-            desc_parts.append(f"  ✓ {_GATEWAY_TOOL_LABELS[k]} — using Tool Gateway")
-    if unconfigured:
-        for k in unconfigured:
-            desc_parts.append(f"  ○ {_GATEWAY_TOOL_LABELS[k]} — not configured")
-    if has_direct:
-        for k in has_direct:
-            desc_parts.append(f"  ○ {_GATEWAY_TOOL_LABELS[k]} — using {_GATEWAY_DIRECT_LABELS[k]}")
-
-    # Build short choice labels — detail is in the description above
-    choices: list[str] = []
-    choice_keys: list[str] = []  # maps choice index -> action
-
-    if unconfigured and has_direct:
-        choices.append("Enable for all tools (existing keys kept, not used)")
-        choice_keys.append("all")
-
-        choices.append("Enable only for tools without existing keys")
-        choice_keys.append("unconfigured")
-
-        choices.append("Skip")
-        choice_keys.append("skip")
-
-    elif unconfigured:
-        choices.append("Enable Tool Gateway")
-        choice_keys.append("unconfigured")
-
-        choices.append("Skip")
-        choice_keys.append("skip")
-
-    else:
-        choices.append("Enable Tool Gateway (existing keys kept, not used)")
-        choice_keys.append("all")
-
-        choices.append("Skip")
-        choice_keys.append("skip")
-
-    description = "\n".join(desc_parts) if desc_parts else None
-    # Default to "Enable" when user has no direct keys (new user),
-    # default to "Skip" when they have existing keys to preserve.
-    default_idx = 0 if not has_direct else len(choices) - 1
-
-    try:
-        idx = prompt_choice(
-            "Your Nous subscription includes the Tool Gateway.",
-            choices,
-            default_idx,
-            description=description,
-        )
-    except (KeyboardInterrupt, EOFError, OSError, SystemExit):
-        return set()
-
-    action = choice_keys[idx]
-    if action == "skip":
-        return set()
-
-    if action == "all":
-        # Apply to switchable tools + ensure already-managed tools also
-        # have use_gateway persisted in config for consistency.
-        to_apply = list(_ALL_GATEWAY_KEYS)
-    else:
-        to_apply = unconfigured
-
-    changed = apply_gateway_defaults(config, to_apply)
-    if changed:
-        from cronus_cli.config import save_config
-        save_config(config)
-        # Only report the tools that actually switched (not already-managed ones)
-        newly_switched = changed - set(already_managed)
-        for key in sorted(newly_switched):
-            label = _GATEWAY_TOOL_LABELS.get(key, key)
-            print(f"  ✓ {label}: enabled via Nous subscription")
-        if already_managed and not newly_switched:
-            print("  (all tools already using Tool Gateway)")
-    return changed

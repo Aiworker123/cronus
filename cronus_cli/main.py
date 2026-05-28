@@ -3013,8 +3013,6 @@ def _model_flow_nous(config, current_model="", args=None):
         save_config,
         save_env_value,
     )
-    from cronus_cli.nous_subscription import prompt_enable_tool_gateway
-
     state = get_provider_auth_state("nous")
     if not state or not state.get("access_token"):
         print("Not logged into Nous Portal. Starting login...")
@@ -3031,12 +3029,6 @@ def _model_flow_nous(config, current_model="", args=None):
                 insecure=bool(getattr(args, "insecure", False)),
             )
             _login_nous(mock_args, PROVIDER_REGISTRY["nous"])
-            # Offer Tool Gateway enablement for paid subscribers
-            try:
-                _refreshed = load_config() or {}
-                prompt_enable_tool_gateway(_refreshed)
-            except Exception:
-                pass
         except SystemExit:
             print("Login cancelled or failed.")
             return
@@ -3208,8 +3200,6 @@ def _model_flow_nous(config, current_model="", args=None):
             save_env_value("OPENAI_API_KEY", "")
         save_config(config)
         print(f"Default model set to: {selected} (via Nous Portal)")
-        # Offer Tool Gateway enablement for paid subscribers
-        prompt_enable_tool_gateway(config)
     else:
         print("No change.")
 

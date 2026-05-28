@@ -1,4 +1,4 @@
-"""Generic managed-tool gateway helpers for Nous-hosted vendor passthroughs."""
+"""Generic managed-tool gateway helpers."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from typing import Callable, Optional
 logger = logging.getLogger(__name__)
 
 from cronus_constants import get_cronus_home
-from tools.tool_backend_helpers import managed_nous_tools_enabled
 
 _DEFAULT_TOOL_GATEWAY_DOMAIN = "nousresearch.com"
 _DEFAULT_TOOL_GATEWAY_SCHEME = "https"
@@ -129,19 +128,3 @@ def build_vendor_gateway_url(vendor: str) -> str:
     return f"{shared_scheme}://{vendor}-gateway.{_DEFAULT_TOOL_GATEWAY_DOMAIN}"
 
 
-def resolve_managed_tool_gateway(
-    vendor: str,
-    gateway_builder: Optional[Callable[[str], str]] = None,
-    token_reader: Optional[Callable[[], Optional[str]]] = None,
-) -> Optional[ManagedToolGatewayConfig]:
-    """Managed tool gateway is disabled. Users must provide their own API keys."""
-    return None
-
-
-def is_managed_tool_gateway_ready(
-    vendor: str,
-    gateway_builder: Optional[Callable[[str], str]] = None,
-    token_reader: Optional[Callable[[], Optional[str]]] = None,
-) -> bool:
-    """Managed tool gateway is disabled. Returns False always."""
-    return False
