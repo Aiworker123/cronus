@@ -77,6 +77,25 @@ _BLOCKED_DEVICE_PATHS = frozenset({
     "/dev/fd/0", "/dev/fd/1", "/dev/fd/2",
 })
 
+# Windows reserved device names that block or produce unexpected I/O when
+# opened.  These are matched case-insensitively against the final path
+# component (with any trailing colon stripped) so that all of the following
+# are caught:
+#   "CON"           bare name — blocks waiting for console input
+#   "CON:"          bare name with colon (common Windows style)
+#   r"C:\dir\CON"   absolute path to a "file" with a reserved name
+#   "\\.\COM1"      Win32 device namespace
+#   "/dev/con"      MSYS/Git-Bash alias path
+# NUL and PRN are included: NUL blocks when *written* unexpectedly and PRN
+# (print device) blocks reads.  AUX is an alias for COM1.
+_WINDOWS_RESERVED_DEVICE_STEMS = frozenset({
+    "con", "prn", "aux", "nul",
+    "com0", "com1", "com2", "com3", "com4",
+    "com5", "com6", "com7", "com8", "com9",
+    "lpt0", "lpt1", "lpt2", "lpt3", "lpt4",
+    "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+})
+
 
 def _resolve_path(filepath: str, task_id: str = "default") -> Path:
     """Resolve a path relative to TERMINAL_CWD (the worktree base directory)
@@ -143,6 +162,19 @@ def _is_blocked_device_path(path: str) -> bool:
         ("/environ", "/cmdline", "/maps")
     ):
         return True
+    # Windows reserved device names — blocked on all platforms so that a
+    # path like "CON" or r"C:\projects\CON" is caught even when Cronus is
+    # running on Windows via the local backend.  Matching is:
+    #   1. Extract the final path component (basename), strip any trailing
+    #      colon (e.g. "CON:" → "CON"), and lower-case it.
+    #   2. Match against _WINDOWS_RESERVED_DEVICE_STEMS.
+    # This catches bare names, absolute Windows paths, Win32 device-namespace
+    # paths (\\.\COM1), and MSYS/Git-Bash aliases (/dev/con).
+    _basename = os.path.basename(normalized.rstrip("/\\"))
+    if _basename.endswith(":"):
+        _basename = _basename[:-1]
+    if _basename.lower() in _WINDOWS_RESERVED_DEVICE_STEMS:
+        return True
     return False
 
 
@@ -167,10 +199,38 @@ def _is_blocked_device(filepath: str) -> bool:
 
 # Paths that file tools should refuse to write to without going through the
 # terminal tool's approval system.  These match prefixes after os.path.realpath.
-_SENSITIVE_PATH_PREFIXES = (
-    "/etc/", "/boot/", "/usr/lib/systemd/",
-    "/private/etc/", "/private/var/",
-)
+def _build_sensitive_path_prefixes() -> tuple:
+    prefixes = [
+        "/etc/", "/boot/", "/usr/lib/systemd/",
+        "/private/etc/", "/private/var/",
+    ]
+    if os.name == "nt":
+        # Windows system directories.  Use os.environ lookups so the paths are
+        # correct regardless of the drive letter or custom Windows installation.
+        # The backslash separator matches the form returned by os.path.realpath()
+        # on Windows (which Path.resolve() delegates to).
+        sysroot = (
+            os.environ.get("SystemRoot")
+            or os.environ.get("WINDIR")
+            or r"C:\Windows"
+        )
+        prog_files = os.environ.get("ProgramFiles") or r"C:\Program Files"
+        prog_files_x86 = (
+            os.environ.get("ProgramFiles(x86)") or r"C:\Program Files (x86)"
+        )
+        # Add both backslash and forward-slash variants so MSYS-style paths
+        # (/c/Windows/System32/) are caught as well as native Windows paths.
+        for base, fwd in (
+            (sysroot, sysroot.replace("\\", "/")),
+            (prog_files, prog_files.replace("\\", "/")),
+            (prog_files_x86, prog_files_x86.replace("\\", "/")),
+        ):
+            prefixes.append(base + "\\")
+            prefixes.append(fwd + "/")
+    return tuple(prefixes)
+
+
+_SENSITIVE_PATH_PREFIXES = _build_sensitive_path_prefixes()
 _SENSITIVE_EXACT_PATHS = {"/var/run/docker.sock", "/run/docker.sock"}
 
 

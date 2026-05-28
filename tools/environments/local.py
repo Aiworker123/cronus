@@ -576,7 +576,32 @@ class LocalEnvironment(BaseEnvironment):
 
         try:
             if _IS_WINDOWS:
-                proc.terminate()
+                # Kill the entire Windows process tree (bash + all its children).
+                # proc.terminate() only kills the bash wrapper process; any child
+                # processes it spawned (compilers, servers, npm install, …) keep
+                # running as orphans.  taskkill /F /T /PID recursively terminates
+                # every process in the job/process tree, matching the POSIX
+                # os.killpg(pgid, SIGKILL) semantics used on Linux/macOS.
+                # taskkill ships with every Windows version since Vista and
+                # requires no elevation for processes owned by the current user.
+                # We hide the console window it would otherwise flash (/F /T are
+                # non-interactive, but CREATE_NO_WINDOW keeps the UX clean).
+                # Fall back to proc.terminate() on any failure (e.g. locked-down
+                # corporate policy that blocks taskkill, or the process already
+                # exited between our check and the call).
+                try:
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=5,
+                        creationflags=windows_hide_flags(),
+                    )
+                except Exception:
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
             else:
                 try:
                     pgid = os.getpgid(proc.pid)
