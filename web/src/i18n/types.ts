@@ -137,8 +137,8 @@ export interface Translations {
     starting: string;
     startedInBackground: string;
     stopped: string;
-    updateHermes: string;
-    updatingHermes: string;
+    updateCronus: string;
+    updatingCronus: string;
     waitingForOutput: string;
   };
 
@@ -454,7 +454,7 @@ export interface Translations {
     switchTheme: string;
   };
 
-  // ── Achievements plugin (plugins/hermes-achievements) ──
+  // ── Achievements plugin (plugins/cronus-achievements) ──
   achievements: {
     hero: {
       kicker: string;

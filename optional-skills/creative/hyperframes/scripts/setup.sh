@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HyperFrames setup for Hermes.
+# HyperFrames setup for Cronus.
 #
 # Verifies Node >= 22 and FFmpeg, installs the `hyperframes` CLI globally,
 # pre-caches `chrome-headless-shell`, and runs `hyperframes doctor`.

@@ -1,6 +1,6 @@
 """Tests for the ``pinPeerName`` / ``pinUserPeer`` config flag.
 
-Under a gateway (Telegram, Discord, Slack, ...) Hermes passes the
+Under a gateway (Telegram, Discord, Slack, ...) Cronus passes the
 platform-native user ID as ``runtime_user_peer_name`` into
 ``HonchoSessionManager``.  By default that ID wins over any configured
 ``peer_name`` so multi-user bots scope memory per user.
@@ -42,7 +42,7 @@ class TestPinPeerNameConfigParsing:
             "peerName": "Igor",
             "pinPeerName": True,
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("CRONUS_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is True
@@ -55,10 +55,10 @@ class TestPinPeerNameConfigParsing:
             "apiKey": "k",
             "peerName": "Igor",
             "hosts": {
-                "hermes": {"pinPeerName": True},
+                "cronus": {"pinPeerName": True},
             },
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("CRONUS_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is True
@@ -71,10 +71,10 @@ class TestPinPeerNameConfigParsing:
             "peerName": "Igor",
             "pinPeerName": True,
             "hosts": {
-                "hermes": {"pinPeerName": False},
+                "cronus": {"pinPeerName": False},
             },
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("CRONUS_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is False, (
@@ -89,7 +89,7 @@ class TestPinPeerNameConfigParsing:
             "peerName": "Igor",
             "pinPeerName": False,
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("CRONUS_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is False
@@ -125,7 +125,7 @@ class TestRuntimePeerMappingConfigParsing:
             "apiKey": "k",
             "userPeerAliases": {"root-user": "root-peer"},
             "hosts": {
-                "hermes": {
+                "cronus": {
                     "userPeerAliases": {"host-user": "host-peer"},
                 },
             },
@@ -141,7 +141,7 @@ class TestRuntimePeerMappingConfigParsing:
             "apiKey": "k",
             "userPeerAliases": {"root-user": "root-peer"},
             "hosts": {
-                "hermes": {
+                "cronus": {
                     "userPeerAliases": {},
                 },
             },
@@ -157,7 +157,7 @@ class TestRuntimePeerMappingConfigParsing:
             "apiKey": "k",
             "runtimePeerPrefix": "telegram_",
             "hosts": {
-                "hermes": {
+                "cronus": {
                     "runtimePeerPrefix": "",
                 },
             },
@@ -520,7 +520,7 @@ class TestPeerResolutionOrder:
             api_key="k",
             peer_name="Igor",
             pin_peer_name=True,
-            ai_peer="hermes-assistant",
+            ai_peer="cronus-assistant",
             enabled=False,
             write_frequency="turn",
         )
@@ -533,11 +533,11 @@ class TestPeerResolutionOrder:
 
         session = mgr.get_or_create("telegram:86701400")
         assert session.user_peer_id == "Igor"
-        assert session.assistant_peer_id == "hermes-assistant"
+        assert session.assistant_peer_id == "cronus-assistant"
 
 
 class TestCrossPlatformMemoryUnification:
-    """The same physical user talking to Hermes via Telegram AND Discord
+    """The same physical user talking to Cronus via Telegram AND Discord
     lands on ONE peer when ``pinPeerName`` is opted in.
     """
 
@@ -636,7 +636,7 @@ class TestPinUserPeerAlias:
             "apiKey": "***",
             "peerName": "eri",
             "pinPeerName": False,
-            "hosts": {"hermes": {"pinUserPeer": True}},
+            "hosts": {"cronus": {"pinUserPeer": True}},
         }))
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is True
@@ -649,7 +649,7 @@ class TestPinUserPeerAlias:
             "apiKey": "***",
             "peerName": "eri",
             "pinPeerName": True,
-            "hosts": {"hermes": {"pinUserPeer": False}},
+            "hosts": {"cronus": {"pinUserPeer": False}},
         }))
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is False, (
@@ -664,7 +664,7 @@ class TestPinUserPeerAlias:
         config_file.write_text(json.dumps({
             "apiKey": "***",
             "peerName": "eri",
-            "hosts": {"hermes": {"pinPeerName": True}},
+            "hosts": {"cronus": {"pinPeerName": True}},
         }))
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is True
@@ -743,7 +743,7 @@ class TestPinTransition:
         from gateway.run import GatewayRunner
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("CRONUS_HOME", str(tmp_path))
 
         cfg_path.write_text(json.dumps({"apiKey": "k", "peerName": "Igor", "pinPeerName": True}))
         sig_pinned = GatewayRunner._extract_cache_busting_config({})
@@ -757,7 +757,7 @@ class TestPinTransition:
         from gateway.run import GatewayRunner
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("CRONUS_HOME", str(tmp_path))
 
         cfg_path.write_text(json.dumps({"apiKey": "k", "peerName": "Igor"}))
         sig_no_aliases = GatewayRunner._extract_cache_busting_config({})
@@ -775,7 +775,7 @@ class TestPinTransition:
         from gateway.run import GatewayRunner
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("CRONUS_HOME", str(tmp_path))
 
         cfg_path.write_text(json.dumps({"apiKey": "k", "peerName": "Igor"}))
         sig_no_prefix = GatewayRunner._extract_cache_busting_config({})
@@ -799,12 +799,12 @@ class TestPinTransition:
         from gateway.run import GatewayRunner
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("CRONUS_HOME", str(tmp_path))
 
         cfg_path.write_text(json.dumps({
             "apiKey": "k",
             "peerName": "Igor",
-            "aiPeer": "hermes",
+            "aiPeer": "cronus",
         }))
         sig_before = GatewayRunner._extract_cache_busting_config({})
 
@@ -819,10 +819,10 @@ class TestPinTransition:
 
 
 class TestProfilePeerUniqueness:
-    """Each Hermes profile can pin to its own unique peerName.
+    """Each Cronus profile can pin to its own unique peerName.
 
     Profile cloning copies host blocks, but operators routinely diverge them
-    afterwards (e.g. `hermes -p partner` pinned to a different person's peer).
+    afterwards (e.g. `cronus -p partner` pinned to a different person's peer).
     The resolver must honor host-level ``peerName`` so two profiles in the
     same workspace stay scoped to different Honcho peers.
     """
@@ -869,16 +869,16 @@ class TestProfilePeerUniqueness:
             "apiKey": "k",
             "peerName": "default-user",
             "hosts": {
-                "hermes.partner": {
+                "cronus.partner": {
                     "peerName": "partner-user",
                     "pinPeerName": True,
                 },
             },
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("CRONUS_HOME", str(tmp_path / "isolated"))
 
         cfg = HonchoClientConfig.from_global_config(
-            host="hermes.partner", config_path=config_file,
+            host="cronus.partner", config_path=config_file,
         )
         assert cfg.peer_name == "partner-user"
         assert cfg.pin_peer_name is True

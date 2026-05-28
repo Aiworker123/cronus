@@ -12,4 +12,4 @@ def test_dashboard_run_resets_home_before_dropping_privileges() -> None:
 
     assert "#!/command/with-contenv sh" in text
     assert "export HOME=/opt/data" in text
-    assert "exec s6-setuidgid hermes hermes dashboard" in text
+    assert "exec s6-setuidgid cronus cronus dashboard" in text

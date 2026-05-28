@@ -1,1 +1,1 @@
-# Hermes plugins package
+# Cronus plugins package

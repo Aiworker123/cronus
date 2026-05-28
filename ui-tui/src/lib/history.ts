@@ -3,8 +3,8 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 const MAX = 1000
-const dir = process.env.HERMES_HOME ?? join(homedir(), '.hermes')
-const file = join(dir, '.hermes_history')
+const dir = process.env.CRONUS_HOME ?? join(homedir(), '.cronus')
+const file = join(dir, '.cronus_history')
 
 let cache: string[] | null = null
 

@@ -28,12 +28,12 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _isolate_env(tmp_path, monkeypatch):
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    cronus_home = tmp_path / ".cronus"
+    cronus_home.mkdir()
+    monkeypatch.setenv("CRONUS_HOME", str(cronus_home))
     monkeypatch.delenv("SECURITY_GUIDANCE_BLOCK", raising=False)
     monkeypatch.delenv("SECURITY_GUIDANCE_DISABLE", raising=False)
-    yield hermes_home
+    yield cronus_home
 
 
 # ---------------------------------------------------------------------------
@@ -58,19 +58,19 @@ def _load_patterns():
 def _load_plugin_init():
     """Import the plugin __init__.py with patterns.py as a sibling."""
     plugin_dir = _repo_root() / "plugins" / "security-guidance"
-    if "hermes_plugins" not in sys.modules:
-        ns = types.ModuleType("hermes_plugins")
+    if "cronus_plugins" not in sys.modules:
+        ns = types.ModuleType("cronus_plugins")
         ns.__path__ = []
-        sys.modules["hermes_plugins"] = ns
+        sys.modules["cronus_plugins"] = ns
     spec = importlib.util.spec_from_file_location(
-        "hermes_plugins.security_guidance",
+        "cronus_plugins.security_guidance",
         plugin_dir / "__init__.py",
         submodule_search_locations=[str(plugin_dir)],
     )
     mod = importlib.util.module_from_spec(spec)
-    mod.__package__ = "hermes_plugins.security_guidance"
+    mod.__package__ = "cronus_plugins.security_guidance"
     mod.__path__ = [str(plugin_dir)]
-    sys.modules["hermes_plugins.security_guidance"] = mod
+    sys.modules["cronus_plugins.security_guidance"] = mod
     spec.loader.exec_module(mod)
     return mod
 
@@ -322,10 +322,10 @@ class TestPluginDiscovery:
 
         # Wipe any cached plugin state from earlier tests in this worker.
         for k in list(sys.modules):
-            if k.startswith(("hermes_plugins", "hermes_cli.plugins")):
+            if k.startswith(("cronus_plugins", "cronus_cli.plugins")):
                 del sys.modules[k]
 
-        from hermes_cli.plugins import _ensure_plugins_discovered
+        from cronus_cli.plugins import _ensure_plugins_discovered
 
         mgr = _ensure_plugins_discovered(force=True)
         loaded = set()

@@ -7,10 +7,10 @@ import pytest
 
 
 def _make_cli_stub():
-    """Create a minimal HermesCLI-like object with stream state."""
-    from cli import HermesCLI
+    """Create a minimal CronusCLI-like object with stream state."""
+    from cli import CronusCLI
 
-    cli = HermesCLI.__new__(HermesCLI)
+    cli = CronusCLI.__new__(CronusCLI)
     cli.show_reasoning = False
     cli._stream_buf = ""
     cli._stream_started = False

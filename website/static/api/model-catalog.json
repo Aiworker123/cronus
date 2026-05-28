@@ -2,8 +2,8 @@
   "version": 1,
   "updated_at": "2026-05-26T20:49:36Z",
   "metadata": {
-    "source": "hermes-agent repo",
-    "docs": "https://hermes-agent.nousresearch.com/docs/reference/model-catalog"
+    "source": "cronus-agent repo",
+    "docs": "https://cronus-agent.nousresearch.com/docs/reference/model-catalog"
   },
   "providers": {
     "openrouter": {
